@@ -23,26 +23,39 @@ TRAIN_FILE = 'train.csv'
 PRODUCT_DISCOUNT_FILE = 'promotion_schedule.csv'
 
 
-def get_product_prom(product_discount_file):
+def get_product_prom(product_discount_file, product_id_list):
+    product_dis_dict = {}
+    product_adver_dict = {}
+
+    for id in product_id_list:
+        product_dis_dict[id] = 0.0
+        product_adver_dict[id] = 0
+
     data = pd.read_csv(product_discount_file)
+
     product_dis = data['discount']
     product_adver = data['advertised']
     product_id = data['j']
-    product_dis_dict = {}
-    product_adver_dict = {}
+
     for i, id in enumerate(product_id):
         product_dis_dict[id] = product_dis[i]
         product_adver_dict[id] = product_adver[i]
+
     return product_dis_dict, product_adver_dict
 
-# product_dis_dict, product_adver_dict = get_product_prom(PRODUCT_DISCOUNT_FILE)
+# product_dis_dict, product_adver_dict = get_product_prom(PRODUCT_DISCOUNT_FILE, [])
 
 
-def get_product_price(product_purchase_file):
+def get_product_price_list(product_purchase_file, product_id_list):
+    product_price_dict = {}
+    for product_id in product_id_list:
+        product_price_dict[product_id] = [0.0]
+
     data = pd.read_csv(product_purchase_file)
+
     product_id = data['j'].unique()
     weeks = data['t'].unique()
-    product_price_dict = {}
+
     for id in product_id:
         product = data[data['j']==id]
         product_price_list = []
@@ -56,7 +69,7 @@ def get_product_price(product_purchase_file):
 
     return product_price_dict
 
-# product_price_dict = get_product_price(TRAIN_FILE)
+# product_price_dict = get_product_price_list(TRAIN_FILE, [])
 
 
 # TODO: estimate the product price in the future
@@ -94,58 +107,50 @@ def prepare_data(data_user, weeks, product_ids, product_discount_dict,
         #---------------
         # create targets
         current_product_purchased = [0] * product_ids
-        for i in data_user[data_user['t'] == week]['j'].values:
-            current_product_purchased[i] += 1
+        for j in data_user[data_user['t'] == week]['j'].values:
+            current_product_purchased[j] += 1
         Y_train.append(current_product_purchased)
 
         # ---------------
         # create features
-        current_products_prices = [0.0] * product_ids
-        current_products_advertised = [0] * product_ids
-        current_products_discount = [0] * product_ids
         products_purchased = data_user[data_user['t'] == week]
+
+        product_price_cur = [0.0] * product_ids
+        product_adver_cur = [0] * product_ids
         for p_id in products_purchased['j'].values:
-            current_products_prices[p_id] = (products_purchased['price'].values).mean()
-            current_products_advertised[p_id] = int((products_purchased['advertised'].values).mean())
-            if p_id in product_discount_dict:
-                current_products_discount[p_id] = product_discount_dict[p_id]
-            else:
-                current_products_discount[p_id] = 0.0
+            product_price_cur[p_id] = (products_purchased['price'].values).mean()
+            product_adver_cur[p_id] = int((products_purchased['advertised'].values).mean())
 
-
-        total_products_purchased_prices = [0.0] * product_ids
-        total_products_advertised_num = [0] * product_ids
-
+        product_price_prev = [0.0] * product_ids
+        product_adver_prev = [0] * product_ids
         for i in range(nb_prev_months):
             products_purchased = data_user[data_user['t'] == (week-i-1)]
             for i, p_id in enumerate(products_purchased['j'].values):
-                total_products_purchased_prices[p_id] += (products_purchased['price'].values)[i]
-                total_products_advertised_num[p_id] += (products_purchased['advertised'].values)[i]
+                product_price_prev[p_id] += (products_purchased['price'].values)[i]
+                product_adver_prev[p_id] += (products_purchased['advertised'].values)[i]
 
-        X_train.append(np.concatenate([current_products_prices, current_products_advertised,
-                                       current_products_discount, total_products_purchased_prices, total_products_advertised_num]))
+        X_train.append(np.concatenate([product_price_cur, product_adver_cur, product_price_prev, product_adver_prev]))
 
+    #------------
+    # create test set (purchase of next month)
     X_test = []
-    products_prices = [0.0] * product_ids
-    products_advertised = [0] * product_ids
-    products_discount = [0] * product_ids
-    for id, value in product_price_next_month_dict.items():
-        products_prices[id] = value
-    for id, value in product_adver_next_month_dict.items():
-        products_advertised[id] = value
-    for id, value in product_discount_dict.items():
-        products_discount[id] = value
 
-    total_prices_product_purchased = [0.0] * product_ids
-    total_product_advertised = [0] * product_ids
+    product_price_cur = [0.0] * product_ids
+    product_adver_cur = [0] * product_ids
+    for id, value in product_price_next_month_dict.items():
+        product_price_cur[id] = value * (1 - product_discount_dict[p_id])
+    for id, value in product_adver_next_month_dict.items():
+        product_adver_cur[id] = value
+
+    product_price_prev = [0.0] * product_ids
+    product_adver_prev = [0] * product_ids
     for i in range(nb_prev_months):
         products_purchased = data_user[data_user['t'] == (weeks[-1 - i])]
         for i, p_id in enumerate(products_purchased['j'].values):
-            total_prices_product_purchased[p_id] += (products_purchased['price'].values)[i]
-            total_product_advertised[p_id] += (products_purchased['advertised'].values)[i]
+            product_price_prev[p_id] += (products_purchased['price'].values)[i]
+            product_adver_prev[p_id] += (products_purchased['advertised'].values)[i]
 
-    X_test.append(np.concatenate([products_prices, products_advertised, products_discount,
-                                  total_prices_product_purchased, total_product_advertised]))
+    X_test.append(np.concatenate([product_price_cur, product_adver_cur, product_price_prev, product_adver_prev]))
 
     print('--------------------------')
     print('data sets shape')
@@ -177,8 +182,8 @@ def train_mlp(X_train, Y_train, num_classes, epochs=10, batch_size=64, lr_init =
     model = Sequential()
     model.add(Dense(128, activation='relu', input_shape=(X_train.shape[1],)))
     model.add(Dropout(0.2))
-    model.add(Dense(64, activation='relu'))
-    model.add(Dropout(0.2))
+    # model.add(Dense(64, activation='relu'))
+    # model.add(Dropout(0.2))
     model.add(Dense(num_classes, activation='sigmoid'))
     model.compile(loss='binary_crossentropy', optimizer=ks.optimizers.Adam(lr=lr_init))
 
@@ -238,23 +243,22 @@ if __name__ == "__main__":
 
     # get product discount dictionary
     # get product advertisement dictionary
-    product_dis_dict, product_adver_dict = get_product_prom(PRODUCT_DISCOUNT_FILE)
+    product_dis_dict, product_adver_dict = get_product_prom(PRODUCT_DISCOUNT_FILE, product_id_list)
 
     # get product price list
-    product_price = get_product_price(TRAIN_FILE)
+    product_price_list = get_product_price_list(TRAIN_FILE, product_id_list)
 
     # get the product list of next month
-    product_price_next_month = get_product_price_next_month(product_price)
-
+    product_price_next_month = get_product_price_next_month(product_price_list)
 
     # predict consumer purchases
-    nb_prev_months = 2
-    epochs = 5
+    nb_prev_months = 1
+    epochs = 2
     batch_size = 64
     prediction_i = []
     prediction_j = []
     prediction_prob = []
-    # user_id_list = user_id_list[:3]
+    # user_id_list = user_id_list[:2]
     for n_user, user_id in enumerate(user_id_list):
         print('{}/{}'.format(str(n_user+1), len(user_id_list)))
 
