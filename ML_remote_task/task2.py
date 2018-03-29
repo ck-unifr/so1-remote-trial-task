@@ -288,7 +288,7 @@ if __name__ == "__main__":
 
         Y_test = predict(model, X_test)
 
-        if ((n_user+1) % len(user_id_list) == 50):
+        if ((n_user+1) % 50 == 0):
             toc = time.clock()
             time_used = (toc-tic)/60.0
             time_required = (time_used / (n_user+1))*(len(user_id_list) - n_user -1)
