@@ -20,6 +20,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score
 
+import time
 
 TRAIN_FILE = 'train.csv'
 PRODUCT_DISCOUNT_FILE = 'promotion_schedule.csv'
@@ -270,9 +271,8 @@ if __name__ == "__main__":
     prediction_j = []
     prediction_prob = []
     # user_id_list = user_id_list[:2]
+    tic = time.clock()
     for n_user, user_id in enumerate(user_id_list):
-        print('{}/{}'.format(str(n_user+1), len(user_id_list)))
-
         data_user = data[data['i'] == user_id]
 
         X_train, Y_train, X_test = prepare_data(data_user, weeks, product_id_list, product_dis_dict,
@@ -287,6 +287,14 @@ if __name__ == "__main__":
                           epochs=epochs, batch_size=batch_size)
 
         Y_test = predict(model, X_test)
+
+        if ((n_user+1) % len(user_id_list) == 50):
+            toc = time.clock()
+            time_used = (toc-tic)/60.0
+            time_required = (time_used / (n_user+1))*(len(user_id_list) - n_user -1)
+            print('{}/{}'.format(str(n_user + 1), len(user_id_list)))
+            print('time used {} mins.'.format(time_used))
+            print('time required {} mins.'.format(time_required))
 
         for j, y_test in enumerate(Y_test):
             prediction_i.append(user_id)
