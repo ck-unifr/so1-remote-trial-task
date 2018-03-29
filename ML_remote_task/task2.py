@@ -17,6 +17,8 @@ from keras.models import Sequential
 from keras.layers import Dense, Dropout
 
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_auc_score
 
 
 TRAIN_FILE = 'train.csv'
@@ -152,15 +154,15 @@ def prepare_data(data_user, weeks, product_ids, product_discount_dict,
 
     X_test.append(np.concatenate([product_price_cur, product_adver_cur, product_price_prev, product_adver_prev]))
 
-    print('--------------------------')
-    print('data sets shape')
-    print('x train')
-    print(np.array(X_train).shape)
-    print('y train')
-    print(np.array(Y_train).shape)
-    print('x test')
-    print(np.array(X_test).shape)
-    print('--------------------------')
+    # print('--------------------------')
+    # print('data sets shape')
+    # print('x train')
+    # print(np.array(X_train).shape)
+    # print('y train')
+    # print(np.array(Y_train).shape)
+    # print('x test')
+    # print(np.array(X_test).shape)
+    # print('--------------------------')
 
     scaler = StandardScaler()
     scaler.fit(X_train)
@@ -185,7 +187,7 @@ def train_mlp(X_train, Y_train, num_classes, epochs=10, batch_size=64, lr_init =
     # model.add(Dense(64, activation='relu'))
     # model.add(Dropout(0.2))
     model.add(Dense(num_classes, activation='sigmoid'))
-    model.compile(loss='binary_crossentropy', optimizer=ks.optimizers.Adam(lr=lr_init))
+    model.compile(loss='binary_crossentropy', optimizer=ks.optimizers.Adam(lr=lr_init), metrics=['accuracy'])
 
     # y_train = []
     # for y in Y_train:
@@ -203,7 +205,7 @@ def train_mlp(X_train, Y_train, num_classes, epochs=10, batch_size=64, lr_init =
 
     return model
 
-def prediction(model, X_test, model_type='mlp'):
+def predict(model, X_test, model_type='mlp'):
     Y_test = None
     if model_type == 'mlp':
         Y_test = model.predict(X_test)
@@ -211,6 +213,15 @@ def prediction(model, X_test, model_type='mlp'):
     # print(Y_test.shape)
     # print(Y_test)
     return np.reshape(Y_test, (-1, 1))
+
+
+# TODO: k-folds cross validation for hyperparameter tuning
+def evaluate(X_train, Y_train, num_classes):
+    x_train, x_val, y_train, y_val = train_test_split(X_train, Y_train, test_size = 0.2, random_state = 42)
+    model = train_mlp(x_train, y_train, num_classes, epochs=10, batch_size=64, lr_init=1e-3)
+    y_pred = model.predict(x_val)
+    score = roc_auc_score(y_val, y_pred)
+    return score
 
 
 if __name__ == "__main__":
@@ -253,8 +264,8 @@ if __name__ == "__main__":
 
     # predict consumer purchases
     nb_prev_months = 1
-    epochs = 2
-    batch_size = 64
+    epochs = 1
+    batch_size = 128
     prediction_i = []
     prediction_j = []
     prediction_prob = []
@@ -268,10 +279,14 @@ if __name__ == "__main__":
                                                 product_price_next_month, product_adver_dict,
                                                 nb_prev_months=nb_prev_months)
 
+        # evaluate the model
+        # score = evaluate(X_train=X_train, Y_train=Y_train, num_classes=len(product_id_list))
+        # print('score (auc): {}'.format(score))
+
         model = train_mlp(X_train=X_train, Y_train=Y_train, num_classes=len(product_id_list),
                           epochs=epochs, batch_size=batch_size)
 
-        Y_test = prediction(model, X_test)
+        Y_test = predict(model, X_test)
 
         for j, y_test in enumerate(Y_test):
             prediction_i.append(user_id)
@@ -294,7 +309,7 @@ if __name__ == "__main__":
 # 2. Modeling the time dependence of product purchase with recurrent neural networks, e.g., GRU, LSTM
 # 3. Speed up the training process with Spark
 # 4. Train one model for all the users? We could consider user id as a feature?
+# 5. k-folds cross validation for hyperparameter tuning
 #
-
 
 
