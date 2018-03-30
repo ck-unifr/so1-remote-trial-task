@@ -20,6 +20,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score
 
+from sklearn.decomposition import PCA, KernelPCA
+
 import time
 
 TRAIN_FILE = 'train.csv'
@@ -155,6 +157,17 @@ def prepare_data(data_user, weeks, product_ids, product_discount_dict,
 
     X_test.append(np.concatenate([product_price_cur, product_adver_cur, product_price_prev, product_adver_prev]))
 
+
+    scaler = StandardScaler()
+    scaler.fit(X_train)
+    X_train = scaler.transform(X_train)
+    X_test = scaler.transform(X_test)
+
+    # kpca = KernelPCA(kernel="rbf", fit_inverse_transform=True, random_state=42, n_components=None)
+    # kpca.fit(X_train)
+    # X_train = kpca.transform(X_train)
+    # X_test = kpca.transform(X_test)
+
     # print('--------------------------')
     # print('data sets shape')
     # print('x train')
@@ -164,11 +177,6 @@ def prepare_data(data_user, weeks, product_ids, product_discount_dict,
     # print('x test')
     # print(np.array(X_test).shape)
     # print('--------------------------')
-
-    scaler = StandardScaler()
-    scaler.fit(X_train)
-    X_train = scaler.transform(X_train)
-    X_test = scaler.transform(X_test)
 
     return np.array(X_train), np.array(Y_train), np.array(X_test)
 
@@ -185,8 +193,8 @@ def train_mlp(X_train, Y_train, num_classes, epochs=10, batch_size=64, lr_init =
     model = Sequential()
     model.add(Dense(128, activation='relu', input_shape=(X_train.shape[1],)))
     model.add(Dropout(0.2))
-    # model.add(Dense(64, activation='relu'))
-    # model.add(Dropout(0.2))
+    #model.add(Dense(64, activation='relu'))
+    #model.add(Dropout(0.2))
     model.add(Dense(num_classes, activation='sigmoid'))
     model.compile(loss='binary_crossentropy', optimizer=ks.optimizers.Adam(lr=lr_init), metrics=['accuracy'])
 
@@ -264,13 +272,13 @@ if __name__ == "__main__":
     product_price_next_month = get_product_price_next_month(product_price_list)
 
     # predict consumer purchases
-    nb_prev_months = 1
-    epochs = 1
-    batch_size = 128
+    nb_prev_months = 2
+    epochs = 2
+    batch_size = 64
     prediction_i = []
     prediction_j = []
     prediction_prob = []
-    # user_id_list = user_id_list[:2]
+    #user_id_list = user_id_list[:1]
     tic = time.clock()
     for n_user, user_id in enumerate(user_id_list):
         data_user = data[data['i'] == user_id]
@@ -308,6 +316,7 @@ if __name__ == "__main__":
                                                                                              str(epochs), str(batch_size))
     prediction_df.to_csv(prediction_file, index=False)
     print('save prediction to {}'.format(prediction_file))
+
 
 
 # -------------------
