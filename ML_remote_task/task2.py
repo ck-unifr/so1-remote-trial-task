@@ -29,6 +29,16 @@ PRODUCT_DISCOUNT_FILE = 'promotion_schedule.csv'
 
 
 def get_product_prom(product_discount_file, product_id_list):
+    """
+    get a product discount dictionary and a product advertisement dictionary.
+
+    :param product_discount_file: a string contains the file path, e.g., 'promotion_schedule.csv'.
+    :param product_id_list: a list contains all the product id.
+
+    :return:
+    product_dis_dict: a dictionary such that, key: product id, value: discount, e.g., 0.2
+    product_adver_dict: a dictionary such that, key: product id, value: advertised, e.g., 0 or 1
+    """
     product_dis_dict = {}
     product_adver_dict = {}
 
@@ -52,6 +62,15 @@ def get_product_prom(product_discount_file, product_id_list):
 
 
 def get_product_price_list(product_purchase_file, product_id_list):
+    """
+    get a product price dictionary.
+
+    :param product_purchase_file: a string contains the file path, e.g., 'train.csv'.
+    :param product_id_list: a list contains all the product id.
+
+    :return:
+    product_price_dict: a dictionary contains key: product id, value: a list of the product's prices of all the weeks.
+    """
     product_price_dict = {}
     for product_id in product_id_list:
         product_price_dict[product_id] = [0.0]
@@ -79,6 +98,13 @@ def get_product_price_list(product_purchase_file, product_id_list):
 
 # TODO: estimate the product price in the future
 def get_product_price_next_month(product_price_dict):
+    """
+    get the predicted product price of the next week.
+
+    :param product_price_dict: a dictionary contains key: product id, value: a list of the product's prices of all the weeks.
+    :return:
+    product_price_next_month_dict: a dictionary contains key: product id, value: a float value of the average price among all the weeks.
+    """
     product_price_next_month_dict = {}
     for id, values in product_price_dict.items():
         product_price_next_month_dict[id] = np.mean(values)
@@ -92,13 +118,18 @@ def prepare_data(data_user, weeks, product_ids, product_discount_dict,
                      product_price_next_month_dict, product_adver_next_month_dict, nb_prev_months=2):
     """
     create x_train, y_train, x_test
+
     :param data_user: a pandas dataframe contains the purchase data
     :param weeks: a list which contains the indices of weeks
     :param product_ids: a list which contains the product id
     :param nb_prev_months: a integer. In order to predict the probabilities of the products to purchase, we need the data of n previous months.
     :param product_price_next_month: a list contains the products prices
     :param product_adver_next_month: a one-hot-encoded list contains the information of product advertisement (e.g., 0 or 1)
+
     :return:
+    x_train: a numpy array contains the train set features
+    y_train: a numpy array contains the train set targets
+    x_test:  a numpy array contains the test set features
     """
 
     # products purchased for n previous months
@@ -183,6 +214,20 @@ def prepare_data(data_user, weeks, product_ids, product_discount_dict,
 
 # TODO: try different NN architectures
 def train_mlp(X_train, Y_train, num_classes, epochs=10, batch_size=64, lr_init = 1e-3):
+    """
+    train an MLP model
+
+    :param X_train: a numpy array contains the train set features
+    :param Y_train: a numpy array contains the train set targets
+    :param num_classes: an integer contains the number of classes
+    :param epochs: an integer contains the number of epochs
+    :param batch_size: an integer contains the batch size
+    :param lr_init: a float contains the learning rate
+
+    :return:
+    model: a keras object contains the trained MLP model
+    """
+
     # model_in = ks.Input(shape=(X_train.shape[1],), dtype='float32', sparse=True)
     # out = ks.layers.Dense(256, activation='relu')(model_in)
     # # out = ks.layers.Dense(128, activation='relu')(out)
@@ -214,10 +259,18 @@ def train_mlp(X_train, Y_train, num_classes, epochs=10, batch_size=64, lr_init =
 
     return model
 
-def predict(model, X_test, model_type='mlp'):
-    Y_test = None
-    if model_type == 'mlp':
-        Y_test = model.predict(X_test)
+def predict(model, X_test):
+    """
+    predict the test targets.
+
+    :param model: a keras model contains the trained model.
+    :param X_test: a numpy array contains the test features
+
+    :return:
+    a numpy array contains the predicted targets.
+    """
+
+    Y_test = model.predict(X_test)
 
     # print(Y_test.shape)
     # print(Y_test)
@@ -226,6 +279,16 @@ def predict(model, X_test, model_type='mlp'):
 
 # TODO: k-folds cross validation for hyperparameter tuning
 def evaluate(X_train, Y_train, num_classes):
+    """
+    calculate the roc auc score.
+
+    :param X_train: a numpy array contains the train features.
+    :param Y_train: a numpy array contains the train targets.
+    :param num_classes: an integer contains the number of classes.
+
+    :return:
+    the ROC AUC score.
+    """
     x_train, x_val, y_train, y_val = train_test_split(X_train, Y_train, test_size = 0.2, random_state = 42)
     model = train_mlp(x_train, y_train, num_classes, epochs=10, batch_size=64, lr_init=1e-3)
     y_pred = model.predict(x_val)
